@@ -1,4 +1,3 @@
-install.packages("tidyverse")
 
 library(tidyverse)
 
@@ -81,11 +80,19 @@ data1 <- data1 |>
          F0_pre = if_else(dif_Y == 0, 1, 0))
 
 
+colSums(is.na(data1))
+
+
 data1 <- data1 |>
   mutate(L4_pre = if_else(dif_Y >= 4, 1, 0), 
          L3_pre = if_else(dif_Y == 3, 1, 0),
          L2_pre = if_else(dif_Y == 2, 1, 0),
          L1_pre = if_else(dif_Y == 1, 1, 0))
+
+data1 <- data1 |> 
+  mutate(across(starts_with("F"), ~ if_else(is.na(.), 0, .))) |>
+  mutate(across(starts_with("L"), ~ if_else(is.na(.), 0, .)))
+
 
 
 # for or fastdummy 後でやろう
@@ -95,10 +102,10 @@ data1 <- data1 |>
   mutate(L4_pre = if_else(state == "North Carolina" & dif_Y >= 5, 0, L4_pre))
   
 # 確認
-data1 |>
-  filter(state == "North Carolina")|>
-  select(state, year, dif_Y, L4_pre)|>
-  view()
+# data1 |>
+#   filter(state == "North Carolina")|>
+#   select(state, year, dif_Y, L4_pre)|>
+#   view()
 
 names(data1)
 
@@ -115,64 +122,68 @@ data2 <- data1 |>
 
 # regression----
 ## baseline----
-install.packages("fixest")
+
   library(fixest)
-model1 <- feols(lne031 ~ F10_pre + F9_pre + F8_pre + F7_pre + F6_pre +
-               F5_pre + F4_pre + F3_pre + F2_pre + F1_pre + F0_pre +
-               L1_pre + L2_pre + L3_pre + L4_pre + lnp_income + factor(year) +
-                 factor(state)| stid,  data = data2)
+
 model1 <- feols(lne031 ~ F10_pre + F9_pre + F8_pre + F7_pre + F6_pre +
                   F5_pre + F4_pre + F3_pre + F2_pre + F1_pre + F0_pre +
-                  L1_pre + L2_pre + L3_pre + L4_pre + lnp_income + factor(year) +
-                  factor(stid)|state + year,  data = data2)
+                  L1_pre + L2_pre + L3_pre + L4_pre + lnp_income | stid + year, 
+                cluster = ~ stid, data = data2)
 
+colSums(is.na(data2))
 summary(model1)
+coefplot(model1)
 
-
-
-
- 
-
-
-
-
-
-library(dplyr)
-
-# データの処理
-data1 <- data1 |>
-  # 年差を計算
-  mutate(dif_Y = year - law_year) |>
-  # F-9_pre から F0_pre までの変数を作成
-  mutate(across(
-    .cols = paste0("F", -9:0, "_pre"), # 作成する列名のパターン
-    .fns = ~ case_when(
-      # 条件に基づいて1または0を設定
-      dif_Y == as.integer(sub("F", "", sub("_pre", "", cur_column()))) ~ 1,
-      TRUE ~ 0
-    ),
-    .names = "{col}"  # 列名をそのまま使う
-  ))
-
-# データを確認
-print(data1)
-
-
-# Create L0_pre, L1_pre, ..., L10_pre
-for (i in 1:4) {
-  data1 <- data1 |> 
-    mutate(!!paste0("L", i, "_pre"):= 0)
-}
-
-
-
-
-
-  #select(state, year, e001, e031, stid, p_income, )
-
-#*************** BASELINE ***************
-#  reg  F10_last_pre F9_pre F8_pre F7_pre F6_pre F5_pre F4_pre F3_pre F2_pre uno F0_pre L1_pre L2_pre L3_pre L4_last_pre	
+library(haven)
+stata_data <- haven::read_dta("C:/Users/Owner/Downloads/112082-V1/Political-Responsiveness--State-Level-/Generate-Dataset/State_Level_Dataset_Modified.dta")
+stata_data <- stata_data |>
+  mutate(uno = 0) 
+model2 <- feols(lne031 ~ F10_last_pre + F9_pre + F8_pre + F7_pre + F6_pre +
+                  F5_pre + F4_pre + F3_pre + F2_pre + uno + F0_pre +
+                  L1_pre + L2_pre + L3_pre + L4_last_pre + lnp_income | stid + year, 
+                cluster = ~ stid, data = stata_data)
+# reg lne031 F10_last_pre F9_pre F8_pre F7_pre F6_pre F5_pre F4_pre F3_pre F2_pre uno F0_pre L1_pre L2_pre L3_pre L4_last_pre i.stid i.year lnp_income, cluster(stid)	
 # eststo no_trend
+summary(model2)
 
-data |>
-  filter()
+
+
+# library(dplyr)
+# 
+# # データの処理
+# data1 <- data1 |>
+#   # 年差を計算
+#   mutate(dif_Y = year - law_year) |>
+#   # F-9_pre から F0_pre までの変数を作成
+#   mutate(across(
+#     .cols = paste0("F", -9:0, "_pre"), # 作成する列名のパターン
+#     .fns = ~ case_when(
+#       # 条件に基づいて1または0を設定
+#       dif_Y == as.integer(sub("F", "", sub("_pre", "", cur_column()))) ~ 1,
+#       TRUE ~ 0
+#     ),
+#     .names = "{col}"  # 列名をそのまま使う
+#   ))
+# 
+# # データを確認
+# print(data1)
+# 
+# 
+# # Create L0_pre, L1_pre, ..., L10_pre
+# for (i in 1:4) {
+#   data1 <- data1 |> 
+#     mutate(!!paste0("L", i, "_pre"):= 0)
+# }
+# 
+# 
+# 
+# 
+# 
+#   #select(state, year, e001, e031, stid, p_income, )
+# 
+# #*************** BASELINE ***************
+# #  reg  F10_last_pre F9_pre F8_pre F7_pre F6_pre F5_pre F4_pre F3_pre F2_pre uno F0_pre L1_pre L2_pre L3_pre L4_last_pre	
+# # eststo no_trend
+# 
+# data |>
+#   filter()
